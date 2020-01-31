@@ -1,4 +1,4 @@
-package com.example.a1pos
+package com.ces.a1pos
 
 import android.os.Bundle
 import android.view.WindowManager
@@ -14,18 +14,28 @@ import io.flutter.embedding.engine.FlutterEngine
 import io.flutter.plugin.common.MethodChannel
 import io.flutter.plugins.GeneratedPluginRegistrant
 import org.json.JSONObject
+import java.io.File
 import java.math.BigDecimal
 import java.text.NumberFormat
-import java.util.ArrayList
+import android.os.Environment.getExternalStorageDirectory
 
-class MainActivity: FlutterActivity() {
+import java.util.*
+
+import android.net.Uri
+import io.flutter.util.PathUtils.getFilesDir
+import androidx.lifecycle.LifecycleRegistry
+import androidx.core.content.ContextCompat.getSystemService
+import android.icu.lang.UCharacter.GraphemeClusterBreak.T
+import androidx.lifecycle.Lifecycle
+
+
+class MainActivity : FlutterActivity() {
     private val ECRREFNUM = "1"
     private val RUNNING_POSLINKS = ArrayList<PosLink>()
     private var SETTINGINIFILE: String? = null
 
     override fun configureFlutterEngine(@NonNull flutterEngine: FlutterEngine) {
         GeneratedPluginRegistrant.registerWith(flutterEngine)
-
     }
 
     public override fun onCreate(savedInstanceState: Bundle?) {
@@ -47,7 +57,6 @@ class MainActivity: FlutterActivity() {
                 } catch (e: Exception) {
                     val blah = e
                 }
-
             }
 
             when (methodCall.method.toUpperCase()) {
@@ -125,6 +134,20 @@ class MainActivity: FlutterActivity() {
                     val editTask = editTransactionAsync(editAmount, transId, result)
                     Thread(editTask).start()
                 }
+                "GET_LOGS" -> {
+                    val logsContent = getLogs()
+
+                    val GSON = Gson()
+
+                    val logContentsJson = GSON.toJson(logsContent)
+
+                    result.success(GSON.toJson(ChannelReturnResponse("OK", logContentsJson)))
+                }
+                "SET_TIP_SHOWN_SETTINGS" -> if (methodCall.arguments != null) {
+                    val tipStatus = methodCall.arguments.toString()
+                    val tipSettingsTask = setTipEnabledAsync(tipStatus, result)
+                    Thread(tipSettingsTask).start()
+                }
                 "TEST_PRINT" -> testPrint()
             }
         }
@@ -132,11 +155,14 @@ class MainActivity: FlutterActivity() {
 
     private fun init() {
         SETTINGINIFILE = applicationContext.filesDir.absolutePath + "/" + Settings.FILENAME
+        Settings.LOGSETTINGINIPATH = context.filesDir.path.toString() + "/logs"
+        Settings.A1POSSETTINGINIFILE = context.filesDir.path.toString() + "/A1POSSystemSettings.ini"
+
 
         val commSetting = Settings.getCommSettingFromFile(SETTINGINIFILE.toString())
 
-        commSetting.setType(CommSetting.AIDL)
-        commSetting.setTimeOut("60000")
+        commSetting.type = CommSetting.AIDL
+        commSetting.timeOut = "60000"
         //        commSetting.setSerialPort("COM1");
         //        commSetting.setBaudRate("9600");
         //        commSetting.setDestIP("172.16.20.15");
@@ -146,7 +172,13 @@ class MainActivity: FlutterActivity() {
 
         Settings.saveCommSettingToFile(SETTINGINIFILE.toString(), commSetting)
 
+        LogSetting.setOutputPath(Settings.LOGSETTINGINIPATH)
+
+        LogSetting.setLevel(LogSetting.LOGLEVEL.DEBUG)
         LogSetting.setLogMode(true)
+
+
+        Settings.initSystemSettingsFile()
     }
 
     private fun GetPosLink(): PosLink {
@@ -160,7 +192,7 @@ class MainActivity: FlutterActivity() {
     }
 
     private fun setNavBarSettingsAsync(status: String, RESULT: MethodChannel.Result): Runnable {
-        return r{
+        return r {
             try {
                 MiscSettings.setNavigationBarEnable(applicationContext, java.lang.Boolean.parseBoolean(status))
 
@@ -174,16 +206,37 @@ class MainActivity: FlutterActivity() {
         }
     }
 
+    private fun setTipEnabledAsync(status: String, RESULT: MethodChannel.Result): Runnable {
+        return r {
+            try {
+                var a1posSetting = Settings.A1posSetting()
+                a1posSetting.TipEnabled = status.toBoolean()
+
+                Settings.writeSettingsFile(a1posSetting)
+
+                runOnUiThread {
+                    val GSON = Gson()
+                    RESULT.success(GSON.toJson(ChannelReturnResponse("OK", "SUCCESS")))
+                }
+            } catch (e: Exception) {
+                errorOnUiThread("FAILED TO LOAD SETTINGS FILE", RESULT)
+            }
+        }
+    }
+
+
     private fun getSystemSettings(RESULT: MethodChannel.Result): Runnable {
-        return r{
+        return r {
             try {
                 val isNavigationBarEnabled = MiscSettings.isNavigationBarEnable(applicationContext)
                 //                boolean isHomeKeyEnabled = MiscSettings.isHomeKeyEnable(getApplicationContext());
                 //                boolean isRecentKeyEnabled = MiscSettings.isRecentKeyEnable(getApplicationContext());
 
+                val a1posSetting = Settings.readSettingsFile()
 
                 val cSetAsJson = JSONObject()
                 cSetAsJson.put("isNavigationBarEnabled", isNavigationBarEnabled)
+                cSetAsJson.put("tipEnabled", a1posSetting.TipEnabled)
 
 
                 runOnUiThread {
@@ -197,7 +250,7 @@ class MainActivity: FlutterActivity() {
     }
 
     private fun getCommSettingsAsync(RESULT: MethodChannel.Result): Runnable {
-        return r{
+        return r {
             try {
                 val settingIniFile = applicationContext.filesDir.absolutePath + "/" + Settings.FILENAME
 
@@ -206,11 +259,6 @@ class MainActivity: FlutterActivity() {
                 val cSetAsJson = JSONObject()
                 cSetAsJson.put("timeOut", cSet.getTimeOut())
                 cSetAsJson.put("commType", cSet.getType())
-                //                cSetAsJson.put("serialPort", cSet.getSerialPort());
-                //                cSetAsJson.put("baudRate", cSet.getBaudRate());
-                //                cSetAsJson.put("ipAddr", cSet.getDestIP());
-                //                cSetAsJson.put("port", cSet.getDestPort());
-                //                cSetAsJson.put("macAddr", cSet.getMacAddr());
 
                 runOnUiThread {
                     val GSON = Gson()
@@ -223,25 +271,13 @@ class MainActivity: FlutterActivity() {
     }
 
     private fun saveCommSettingsAsync(commSettingsObject: String, RESULT: MethodChannel.Result): Runnable {
-        return r{
+        return r {
             try {
                 val jsonObject = JSONObject(commSettingsObject)
-                //                String commType = jsonObject.getString("commType");
                 val timeOut = jsonObject.getString("timeOut")
-                //                String serialPort = jsonObject.getString("serialPort");
-                //                String baudRate = jsonObject.getString("baudRate");
-                //                String ipAddr = jsonObject.getString("ipAddr");
-                //                String port = jsonObject.getString("port");
-                //                String macAddr = jsonObject.getString("macAddr");
 
                 val cSet = CommSetting()
-                //                cSet.setType(commType);
                 cSet.timeOut = timeOut
-                //                cSet.setSerialPort(serialPort);
-                //                cSet.setBaudRate(baudRate);
-                //                cSet.setDestIP(ipAddr);
-                //                cSet.setDestPort(port);
-                //                cSet.setMacAddr(macAddr);
 
                 Settings.saveCommSettingToFile(SETTINGINIFILE.toString(), cSet)
 
@@ -256,9 +292,15 @@ class MainActivity: FlutterActivity() {
     }
 
     private fun processTransactionAsync(amount: String, RESULT: MethodChannel.Result): Runnable {
-        return r{
+        return r {
             try {
                 val posLink = GetPosLink()
+
+                var tipRequestValue = "0"
+                val a1posSettingTipEnabled= Settings.A1POSSETTINGS.TipEnabled
+                if(a1posSettingTipEnabled!!){
+                    tipRequestValue = "1"
+                }
 
                 val transType = "SALE"
                 val paymentRequest = PaymentRequest()
@@ -266,7 +308,7 @@ class MainActivity: FlutterActivity() {
                 paymentRequest.TenderType = paymentRequest.ParseTenderType("CREDIT")
                 paymentRequest.TransType = paymentRequest.ParseTransType(transType)
                 paymentRequest.ECRRefNum = ECRREFNUM
-                paymentRequest.ExtData = "<TipRequest>1</TipRequest> " +
+                paymentRequest.ExtData = "<TipRequest>$tipRequestValue</TipRequest> " +
                         "<CPMode>1</CPMode>" +
                         "<ReceiptPrint>3</ReceiptPrint>" +
                         "<SignatureCapture>1</SignatureCapture>"
@@ -300,8 +342,38 @@ class MainActivity: FlutterActivity() {
         }
     }
 
+    private fun getLogs(): ArrayList<String> {
+        var linesOfText = ArrayList<String>()
+
+        try {
+            val directory = File(Settings.LOGSETTINGINIPATH)
+            val files = directory.listFiles()
+
+
+            for (file in files) {
+                linesOfText.add("-------------------- START OF ${file.name}--------------------")
+                val myReader = Scanner(file)
+                while (myReader.hasNextLine()) {
+                    val data = myReader.nextLine()
+                    linesOfText.add(data)
+                }
+                myReader.close()
+
+                linesOfText.add("-------------------- END OF ${file.name}--------------------")
+            }
+
+            return linesOfText
+        } catch (ex: Exception) {
+            var blah = ex.message
+        }
+
+        linesOfText.add("failed to get logs")
+
+        return linesOfText
+    }
+
     private fun refundTransactionAsync(amount: String, RESULT: MethodChannel.Result): Runnable {
-        return r{
+        return r {
             try {
                 val posLink = GetPosLink()
 
@@ -344,7 +416,7 @@ class MainActivity: FlutterActivity() {
     }
 
     private fun getTransactionsSummaryAsync(RESULT: MethodChannel.Result): Runnable {
-        return r{
+        return r {
             try {
                 val posLink = GetPosLink()
 
@@ -378,7 +450,7 @@ class MainActivity: FlutterActivity() {
     }
 
     private fun getTransactionsDetailsAsync(pageIndex: Int, pageSize: Int, RESULT: MethodChannel.Result): Runnable {
-        return r{
+        return r {
             try {
                 val posLink = GetPosLink()
 
@@ -424,8 +496,6 @@ class MainActivity: FlutterActivity() {
                         val returnMsg = GSON.toJson(transList)
                         RESULT.success(GSON.toJson(ChannelReturnResponse("OK", returnMsg)))
                     }
-                    //                    runOnUiThread(() -> Toast.makeText(getApplicationContext(), "Test", Toast.LENGTH_LONG).show());
-                    //                    //                    printTransaction("", transType);
                 } else {
                     errorOnUiThread("TRANSACTION DECLINED", RESULT)
                 }
@@ -437,7 +507,7 @@ class MainActivity: FlutterActivity() {
     }
 
     private fun closeBatchAsync(RESULT: MethodChannel.Result): Runnable {
-        return r{
+        return r {
             try {
                 val posLink = GetPosLink()
 
@@ -602,7 +672,7 @@ class MainActivity: FlutterActivity() {
     }
 
     private fun editTransactionAsync(amount: String, transId: String, RESULT: MethodChannel.Result): Runnable {
-        return r{
+        return r {
 
             try {
                 val posLink = GetPosLink()

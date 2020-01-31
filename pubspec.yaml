@@ -28,6 +28,8 @@ dependencies:
   flutter_launcher_icons: ^0.7.4
   xml2json: ^4.1.0
   flutter_masked_text: ^0.7.0
+  flutter_secure_storage: ^3.3.1+1
+  battery: ^0.3.1+7
 
 dev_dependencies:
   flutter_test:

@@ -1,11 +1,14 @@
+import 'dart:async';
 import 'dart:convert';
 
 import 'package:a1pos/components/appbarwidget.dart';
+import 'package:a1pos/main.dart';
 import 'package:a1pos/models/CommSetting.dart';
 import 'package:a1pos/services/settings.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:fluttertoast/fluttertoast.dart';
+import 'package:intl/intl.dart';
 
 class SettingsScreen extends StatefulWidget {
   SettingsScreen({Key key, this.title}) : super(key: key);
@@ -18,7 +21,7 @@ class SettingsScreen extends StatefulWidget {
 
 class SettingsScreenState extends State<SettingsScreen> {
   CommSetting commSettings;
-  // var password = "duck basketball";
+  //var password = "duck basketball";
   var password = "b";
   var settingsPlatformService = new SettingsPlatformService();
 
@@ -27,12 +30,17 @@ class SettingsScreenState extends State<SettingsScreen> {
   var commTypeController = TextEditingController();
   var timeOutController = TextEditingController();
 
+  var autoBatchController = TextEditingController();
+
   var isAuthenticated = false;
   var isLoadingSettings = false;
 
   var currentTabTitle = 'System Settings';
 
   var navBarEnabled = false;
+  var tipScreenEnabled = false;
+
+  // var autoBatchStatus = false;
 
   @override
   void initState() {
@@ -46,11 +54,22 @@ class SettingsScreenState extends State<SettingsScreen> {
 
     var systemSettingsResponse =
         await settingsPlatformService.getSystemSettings();
-    var systemSettingsResponseJson = jsonDecode(systemSettingsResponse);
-    var systemSettingsJson =
-        jsonDecode(systemSettingsResponseJson["RETURN_MSG"]);
 
-    navBarEnabled = systemSettingsJson["isNavigationBarEnabled"];
+    navBarEnabled = systemSettingsResponse["isNavigationBarEnabled"];
+    tipScreenEnabled = systemSettingsResponse["tipEnabled"];
+    // var status = false;
+
+    // if (systemSettingsResponse["autoBatchStatus"] != null) {
+    //   if (systemSettingsResponse["autoBatchStatus"] != "false") {
+    //     status = true;
+    //   }
+    // }
+
+    // //  status == null
+    // //       ? false
+    // //       : systemSettingsResponse["autoBatchStatus"];
+    // autoBatchStatus = status;
+    // autoBatchController.text = systemSettingsResponse["autoBatchTime"];
 
     var settingsResponse = await settingsPlatformService.getSettings();
     var settingsResponseJson = jsonDecode(settingsResponse);
@@ -118,6 +137,58 @@ class SettingsScreenState extends State<SettingsScreen> {
     }
   }
 
+  void toggleTipScreenShown(bool value) async {
+    var response = await settingsPlatformService.setTipShownSetting(value);
+    var settingsResponseJson = jsonDecode(response);
+    if (settingsResponseJson["RETURN_CODE"] == "OK") {
+      setState(() {
+        tipScreenEnabled = value;
+      });
+    }
+  }
+
+  // void toggleAutoBatch(bool value) async {
+  //   if (value) {
+  //     var time = await settingsService.getAutoBatchTime();
+  //     startAutoBatchTimer(time);
+  //   } else {
+  //     stopAutoBatchTimer();
+  //   }
+
+  //   await settingsPlatformService.setAutoBatchStatus(value);
+
+  //   setState(() {
+  //     autoBatchStatus = value;
+  //   });
+  // }
+
+  Future<Null> selectTimePicker(BuildContext context) async {
+    final TimeOfDay picked = await showTimePicker(
+      context: context,
+      initialTime: TimeOfDay(hour: 10, minute: 47),
+      builder: (BuildContext context, Widget child) {
+        return MediaQuery(
+          data: MediaQuery.of(context).copyWith(alwaysUse24HourFormat: false),
+          child: child,
+        );
+      },
+    );
+    if (picked != null) {
+      var dt = formatTimeOfDay(picked);
+
+      autoBatchController.text = dt;
+
+      SystemChannels.textInput.invokeMethod('TextInput.hide');
+    }
+  }
+
+  String formatTimeOfDay(TimeOfDay tod) {
+    final now = new DateTime.now();
+    final dt = DateTime(now.year, now.month, now.day, tod.hour, tod.minute);
+    final format = DateFormat.jm(); //"6:00 AM"
+    return format.format(dt);
+  }
+
   @override
   Widget build(BuildContext context) {
     return Scaffold(
@@ -178,7 +249,54 @@ class SettingsScreenState extends State<SettingsScreen> {
                                       ),
                                     ],
                                   ),
-                                  Divider(),
+                                  Divider(
+                                    height: 30,
+                                  ),
+                                  Row(
+                                    mainAxisAlignment: MainAxisAlignment.start,
+                                    children: <Widget>[
+                                      Text("Tips Enabled"),
+                                      Switch(
+                                        onChanged: (bool value) {
+                                          toggleTipScreenShown(value);
+                                        },
+                                        value: tipScreenEnabled,
+                                      ),
+                                    ],
+                                  ),
+                                  Divider(
+                                    height: 30,
+                                  ),
+                                  // Row(
+                                  //   mainAxisAlignment: MainAxisAlignment.start,
+                                  //   children: <Widget>[
+                                  //     Text("Auto Batch"),
+                                  //     Switch(
+                                  //       onChanged: (bool value) {
+                                  //         toggleAutoBatch(value);
+                                  //       },
+                                  //       value: autoBatchStatus,
+                                  //     ),
+                                  //   ],
+                                  // ),
+
+                                  // TextFormField(
+                                  //   onTap: () {
+                                  //     selectTimePicker(context);
+                                  //   },
+                                  //   readOnly: true,
+                                  //   controller: autoBatchController,
+                                  //   enabled: autoBatchStatus,
+                                  //   autofocus: false,
+                                  //   decoration: InputDecoration(
+                                  //     labelText: "Auto Batch Time",
+                                  //   ),
+                                  // ),
+                                  // Text(""),
+                                  // Text(""),
+                                  // Divider(
+                                  //   height: 30,
+                                  // ),
                                   Row(
                                     mainAxisAlignment: MainAxisAlignment.start,
                                     children: <Widget>[

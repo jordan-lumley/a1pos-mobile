@@ -1,17 +1,27 @@
-package com.example.a1pos
+package com.ces.a1pos
 
+import android.os.Environment
 import com.pax.poslink.CommSetting
+import com.pax.poslink.LogSetting
 
 import java.io.File
 import java.io.FileReader
 import java.io.FileWriter
 import java.io.IOException
+import java.util.*
 
 
 object Settings {
 
+    class A1posSetting{
+        var TipEnabled: Boolean? = false
+    }
+
     val FILENAME = "setting.ini"
 
+    var A1POSSETTINGINIFILE = "z"
+
+    var LOGSETTINGINIPATH = ""
 
     private val Deft = ""
 
@@ -24,6 +34,8 @@ object Settings {
     private val TagTimeout = "TIMEOUT_M"
     private val TagMacAddr = "MACADDR"
     private val TAG_ENABLE_PROXY = "ENABLE_PROXY"
+
+    var A1POSSETTINGS = A1posSetting()
 
     fun saveCommSettingToFile(fileName: String, commsetting: CommSetting): Boolean {
         val ini = IniFile(fileName)
@@ -59,6 +71,80 @@ object Settings {
         return commsetting
     }
 
+     fun initSystemSettingsFile(){
+        try{
+            val file= File(A1POSSETTINGINIFILE)
+
+            if(!file.exists()){
+                if (file.createNewFile()) {
+                    println("File created: " + file.name)
+
+                    var a1posSetting = A1posSetting()
+
+                    val command = "chmod 777 $A1POSSETTINGINIFILE"
+                    val runtime = Runtime.getRuntime()
+                    runtime.exec(command)
+
+                    writeSettingsFile(a1posSetting)
+                }
+            }else{
+                val command = "chmod 777 $A1POSSETTINGINIFILE"
+                val runtime = Runtime.getRuntime()
+                runtime.exec(command)
+
+                readSettingsFile()
+            }
+        }catch(ex: Exception){
+            println("FAILED TO AT initSystemSettingsFile() : ${ex.message}")
+        }
+    }
+
+     fun writeSettingsFile(a1posSetting: A1posSetting){
+        try{
+            val file= File(A1POSSETTINGINIFILE)
+
+            file.writeText("[SYSTEMSETTINGS]\n" +
+                    "TIPENABLED=${a1posSetting.TipEnabled}\n")
+
+            A1POSSETTINGS = a1posSetting
+
+        }catch(ex: Exception){
+            println("FAILED TO AT writeSettingsFile() : ${ex.message}")
+        }
+    }
+
+     fun readSettingsFile(): A1posSetting{
+        try{
+            val file= File(A1POSSETTINGINIFILE)
+
+            var a1posSetting = A1posSetting()
+
+            if(file.readBytes().isEmpty()){
+                writeSettingsFile(a1posSetting)
+            }
+
+            val myReader = Scanner(file)
+            while (myReader.hasNextLine()) {
+                val data = myReader.nextLine()
+                var split = data.split("=")
+                if(split.size > 1){
+                    val key = split[0]
+                    val value= split[1]
+
+                    when(key){
+                        "TIPENABLED"-> a1posSetting.TipEnabled = value.toBoolean()
+                    }
+                }
+            }
+            myReader.close()
+
+            return a1posSetting
+        }catch(ex: Exception){
+            println("FAILED TO AT readSettingsFile() : ${ex.message}")
+        }
+
+        return A1POSSETTINGS
+    }
 }
 
 
@@ -92,6 +178,7 @@ internal class IniFile(private val m_fileName: String) {
                 }
             } catch (e: IOException) {
                 //e.printStackTrace();
+                var blah = "asdfasdf"
             }
 
         }
