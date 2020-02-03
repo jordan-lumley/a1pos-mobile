@@ -1,10 +1,13 @@
 package com.ces.a1pos
 
 import android.os.Bundle
+
 import android.view.WindowManager
 import androidx.annotation.NonNull;
 import com.google.gson.Gson
 import com.pax.poslink.*
+import com.pax.poslink.formManage.ShowDialog
+import com.pax.poslink.formManage.ShowDialogRequest
 import com.pax.poslink.peripheries.MiscSettings
 import com.pax.poslink.peripheries.POSLinkPrinter
 import com.pax.poslink.peripheries.ProcessResult
@@ -14,20 +17,15 @@ import io.flutter.embedding.engine.FlutterEngine
 import io.flutter.plugin.common.MethodChannel
 import io.flutter.plugins.GeneratedPluginRegistrant
 import org.json.JSONObject
+import org.xml.sax.InputSource
 import java.io.File
+import java.io.StringReader
 import java.math.BigDecimal
 import java.text.NumberFormat
-import android.os.Environment.getExternalStorageDirectory
 
 import java.util.*
-
-import android.net.Uri
-import io.flutter.util.PathUtils.getFilesDir
-import androidx.lifecycle.LifecycleRegistry
-import androidx.core.content.ContextCompat.getSystemService
-import android.icu.lang.UCharacter.GraphemeClusterBreak.T
-import androidx.lifecycle.Lifecycle
-
+import javax.xml.parsers.DocumentBuilder
+import javax.xml.parsers.DocumentBuilderFactory
 
 class MainActivity : FlutterActivity() {
     private val ECRREFNUM = "1"
@@ -297,8 +295,8 @@ class MainActivity : FlutterActivity() {
                 val posLink = GetPosLink()
 
                 var tipRequestValue = "0"
-                val a1posSettingTipEnabled= Settings.A1POSSETTINGS.TipEnabled
-                if(a1posSettingTipEnabled!!){
+                val a1posSettingTipEnabled = Settings.A1POSSETTINGS.TipEnabled
+                if (a1posSettingTipEnabled!!) {
                     tipRequestValue = "1"
                 }
 
@@ -310,8 +308,8 @@ class MainActivity : FlutterActivity() {
                 paymentRequest.ECRRefNum = ECRREFNUM
                 paymentRequest.ExtData = "<TipRequest>$tipRequestValue</TipRequest> " +
                         "<CPMode>1</CPMode>" +
-                        "<ReceiptPrint>3</ReceiptPrint>" +
-                        "<SignatureCapture>1</SignatureCapture>"
+                        "<SignatureCapture>1</SignatureCapture>" +
+                        "<GetSign>1</GetSign>"
 
                 posLink.PaymentRequest = paymentRequest
 
@@ -324,7 +322,9 @@ class MainActivity : FlutterActivity() {
                         paymentReceiptData.put("CardType", posLink.PaymentResponse.CardType)
                         paymentReceiptData.put("TransactionType", transType)
 
-                        printTransactionAsync()
+//                        printTransactionAsync()
+
+                        printTransactionAsync(posLink.PaymentResponse, transType)
 
                         runOnUiThread {
                             val GSON = Gson()
@@ -397,7 +397,7 @@ class MainActivity : FlutterActivity() {
                         paymentReceiptData.put("CardType", posLink.PaymentResponse.CardType)
                         paymentReceiptData.put("TransactionType", transType)
 
-                        printTransactionAsync()
+                        printTransactionAsync(posLink.PaymentResponse, transType)
 
                         runOnUiThread {
                             val GSON = Gson()
@@ -621,7 +621,7 @@ class MainActivity : FlutterActivity() {
                     .addLineSeparator()
                     .addLineSeparator()
 
-            if (!batchResponse.HostTraceNum.isEmpty()) {
+            if (batchResponse.HostTraceNum.isNotEmpty()) {
                 fmtr.addLineSeparator().addLineSeparator().addLeftAlign().addContent("HostTraceNum: ").addContent(batchResponse.HostTraceNum)
             }
 
@@ -644,15 +644,16 @@ class MainActivity : FlutterActivity() {
 
     }
 
-    private fun printTransactionAsync() {
+    private fun printTransactionAsync(paymentResponse: PaymentResponse, origTransType: String, isFromDialog: Boolean= false) {
         try {
             val posLink = GetPosLink()
 
-            val transType = "REPRINT"
+            val transType = "PRINTER"
             val manageRequest = ManageRequest()
             manageRequest.TransType = manageRequest.ParseTransType(transType)
-            manageRequest.ECRRefNum = ECRREFNUM
-            manageRequest.LastReceipt = "1"
+            manageRequest.PrintCopy = "1"
+
+            manageRequest.PrintData = getPrintData(paymentResponse, origTransType)
 
             posLink.ManageRequest = manageRequest
 
@@ -661,6 +662,20 @@ class MainActivity : FlutterActivity() {
             if (result.Code == ProcessTransResult.ProcessTransResultCode.OK) {
                 if (posLink.ManageResponse == null) {
                     throw Error("FAILED TO PRINT")
+                } else {
+                    if(!isFromDialog){
+                        val showDialogRequest = ShowDialogRequest()
+                        showDialogRequest.setTitle("Tear Receipt")
+                        showDialogRequest.setButton1("Ok")
+                        showDialogRequest.setButton2("Cancel")
+
+                        val result = ShowDialog.showDialog(this, showDialogRequest, posLink.GetCommSetting())
+                        if (result.buttonNum == "1") {
+                            printTransactionAsync(paymentResponse, origTransType, true)
+                        }else{
+                                return
+                        }
+                    }
                 }
             } else {
                 throw Error("FAILED TO PRINT")
@@ -668,8 +683,262 @@ class MainActivity : FlutterActivity() {
         } catch (e: Exception) {
             throw Error("FAILED TO PRINT")
         }
-
     }
+
+    private fun getPrintData(paymentResponse: PaymentResponse, origTransType: String): String {
+        val currencyFormatter = NumberFormat.getCurrencyInstance(Locale.US)
+
+        val fmtr = POSLinkPrinter.PrintDataFormatter()
+
+        val extDataDoc = convertStringToXMLDocument(paymentResponse.ExtData)
+
+        val validApprovedAmount = paymentResponse.ApprovedAmount.toBigDecimal().movePointLeft(2)
+        var validTipAmount = BigDecimal.ZERO
+
+        var tip: String
+        if (extDataDoc != null) {
+            tip = extDataDoc!!.getElementsByTagName("TipAmount").item(0).textContent
+
+            validTipAmount = tip.toBigDecimal().movePointLeft(2)
+        }
+
+        val approvedAmount = currencyFormatter.format(validApprovedAmount)
+
+        val a1posSetting = Settings.readSettingsFile()
+
+        val validSubTotal = validApprovedAmount - validTipAmount
+
+        val subTotal = currencyFormatter.format(validSubTotal)
+
+        val tipAmount = currencyFormatter.format(validTipAmount)
+
+
+
+        if(origTransType != "RETURN"){
+            if (!a1posSetting.TipEnabled!!) {
+                fmtr.addHeader()
+                        .addLineSeparator()
+                        .addLeftAlign()
+                        .addDate()
+                        .addRightAlign()
+                        .addTime()
+                        .addLineSeparator()
+                        .addLeftAlign()
+                        .addContent(origTransType)
+                        .addLineSeparator()
+                        .addLineSeparator()
+                        .addLeftAlign()
+                        .addContent("Transaction #:")
+                        .addRightAlign()
+                        .addContent(paymentResponse.RefNum)
+                        .addLineSeparator()
+                        .addLeftAlign()
+                        .addContent("Card Type:")
+                        .addRightAlign()
+                        .addContent(paymentResponse.CardType)
+                        .addLineSeparator()
+                        .addLeftAlign()
+                        .addContent("Account:")
+                        .addRightAlign()
+                        .addContent("******${paymentResponse.BogusAccountNum}")
+                        .addLineSeparator()
+                        .addLeftAlign()
+                        .addContent("Amount:")
+                        .addRightAlign()
+                        .addContent(subTotal)
+                        .addLineSeparator()
+                        .addCenterAlign()
+                        .addContent("------------------------------------------------")
+                        .addLineSeparator()
+                        .addLeftAlign()
+                        .addBigFont()
+                        .addContent("Total:")
+                        .addRightAlign()
+                        .addBigFont()
+                        .addContent(approvedAmount)
+                        .addLineSeparator()
+                        .addLineSeparator()
+                        .addLeftAlign()
+                        .addContent("Ref. NO:")
+                        .addRightAlign()
+                        .addContent(paymentResponse.HostCode)
+                        .addLineSeparator()
+                        .addLeftAlign()
+                        .addContent("Response:")
+                        .addRightAlign()
+                        .addContent(paymentResponse.Message)
+                        .addLineSeparator()
+                        .addLineSeparator()
+                        .addContent("\\\$eSig")
+                        .addLineSeparator()
+                        .addLineSeparator()
+                        .addContent("X_____________________________")
+                        .addLineSeparator()
+                        .addLineSeparator()
+                        .addDisclaimer()
+                        .addLineSeparator()
+                        .addLineSeparator()
+                        .addLineSeparator()
+            } else {
+                fmtr.addHeader()
+                        .addLineSeparator()
+                        .addLeftAlign()
+                        .addDate()
+                        .addRightAlign()
+                        .addTime()
+                        .addLineSeparator()
+                        .addLeftAlign()
+                        .addContent(origTransType)
+                        .addLineSeparator()
+                        .addLineSeparator()
+                        .addLeftAlign()
+                        .addContent("Transaction #:")
+                        .addRightAlign()
+                        .addContent(paymentResponse.RefNum)
+                        .addLineSeparator()
+                        .addLeftAlign()
+                        .addContent("Card Type:")
+                        .addRightAlign()
+                        .addContent(paymentResponse.CardType)
+                        .addLineSeparator()
+                        .addLeftAlign()
+                        .addContent("Account:")
+                        .addRightAlign()
+                        .addContent("******${paymentResponse.BogusAccountNum}")
+                        .addLineSeparator()
+                        .addLeftAlign()
+                        .addContent("Amount:")
+                        .addRightAlign()
+                        .addContent(subTotal)
+                        .addLineSeparator()
+                        .addLeftAlign()
+                        .addContent("Tip:")
+                        .addRightAlign()
+                        .addContent(tipAmount)
+                        .addLineSeparator()
+                        .addCenterAlign()
+                        .addContent("------------------------------------------------")
+                        .addLineSeparator()
+                        .addLeftAlign()
+                        .addBigFont()
+                        .addContent("Total:")
+                        .addRightAlign()
+                        .addBigFont()
+                        .addContent(approvedAmount)
+                        .addLineSeparator()
+                        .addLineSeparator()
+                        .addLeftAlign()
+                        .addContent("Ref. NO:")
+                        .addRightAlign()
+                        .addContent(paymentResponse.HostCode)
+                        .addLineSeparator()
+                        .addLeftAlign()
+                        .addContent("Response:")
+                        .addRightAlign()
+                        .addContent(paymentResponse.Message)
+                        .addLineSeparator()
+                        .addLineSeparator()
+                        .addContent("\\\$eSig")
+                        .addLineSeparator()
+                        .addLineSeparator()
+                        .addContent("X_____________________________")
+                        .addLineSeparator()
+                        .addLineSeparator()
+                        .addDisclaimer()
+                        .addLineSeparator()
+                        .addLineSeparator()
+                        .addLineSeparator()
+            }
+        }else{
+            fmtr.addHeader()
+                    .addLineSeparator()
+                    .addLineSeparator()
+                    .addLeftAlign()
+                    .addDate()
+                    .addRightAlign()
+                    .addTime()
+                    .addLineSeparator()
+                    .addLeftAlign()
+                    .addContent(origTransType)
+                    .addLineSeparator()
+                    .addLineSeparator()
+                    .addLeftAlign()
+                    .addContent("Transaction #:")
+                    .addRightAlign()
+                    .addContent(paymentResponse.RefNum)
+                    .addLineSeparator()
+                    .addLeftAlign()
+                    .addContent("Card Type:")
+                    .addRightAlign()
+                    .addContent(paymentResponse.CardType)
+                    .addLineSeparator()
+                    .addLeftAlign()
+                    .addContent("Account:")
+                    .addRightAlign()
+                    .addContent("******${paymentResponse.BogusAccountNum}")
+                    .addLineSeparator()
+                    .addLeftAlign()
+                    .addContent("Amount:")
+                    .addRightAlign()
+                    .addContent(subTotal)
+                    .addLineSeparator()
+                    .addCenterAlign()
+                    .addContent("------------------------------------------------")
+                    .addLineSeparator()
+                    .addLeftAlign()
+                    .addBigFont()
+                    .addContent("Total:")
+                    .addRightAlign()
+                    .addBigFont()
+                    .addContent(approvedAmount)
+                    .addLineSeparator()
+                    .addLineSeparator()
+                    .addLeftAlign()
+                    .addContent("Ref. NO:")
+                    .addRightAlign()
+                    .addContent(paymentResponse.HostCode)
+                    .addLineSeparator()
+                    .addLeftAlign()
+                    .addContent("Response:")
+                    .addRightAlign()
+                    .addContent(paymentResponse.Message)
+                    .addLineSeparator()
+                    .addLineSeparator()
+                    .addLineSeparator()
+                    .addLineSeparator()
+        }
+
+
+        return fmtr.build()
+    }
+
+//    private fun printTransactionAsync() {
+//        try {
+//            val posLink = GetPosLink()
+//
+//            val transType = "PRINTER"
+//            val manageRequest = ManageRequest()
+//            manageRequest.TransType = manageRequest.ParseTransType(transType)
+//            manageRequest.PrintData = "\$eSig"
+////            manageRequest.ECRRefNum = ECRREFNUM
+////            manageRequest.LastReceipt = "1"
+////            manageRequest.Sig
+//
+//            posLink.ManageRequest = manageRequest
+//
+//            val result = posLink.ProcessTrans()
+//
+//            if (result.Code == ProcessTransResult.ProcessTransResultCode.OK) {
+//                if (posLink.ManageResponse == null) {
+//                    throw Error("FAILED TO PRINT")
+//                }
+//            } else {
+//                throw Error("FAILED TO PRINT")
+//            }
+//        } catch (e: Exception) {
+//            throw Error("FAILED TO PRINT")
+//        }
+//    }
 
     private fun editTransactionAsync(amount: String, transId: String, RESULT: MethodChannel.Result): Runnable {
         return r {
@@ -765,5 +1034,25 @@ class MainActivity : FlutterActivity() {
     }
 
     fun r(f: () -> Unit): Runnable = Runnable { f() }
+
+    private fun convertStringToXMLDocument(xmlString: String): org.w3c.dom.Document? {
+        val xmlStringWithRoot = "<root>$xmlString</root>"
+        //Parser that produces DOM object trees from XML content
+        val factory = DocumentBuilderFactory.newInstance()
+
+        //API to obtain DOM Document instance
+        var builder: DocumentBuilder?
+        try {
+            //Create DocumentBuilder with default configuration
+            builder = factory.newDocumentBuilder()
+
+            //Parse the content to Document object
+            return builder!!.parse(InputSource(StringReader(xmlStringWithRoot)))
+        } catch (e: Exception) {
+            e.printStackTrace()
+        }
+
+        return null
+    }
 
 }

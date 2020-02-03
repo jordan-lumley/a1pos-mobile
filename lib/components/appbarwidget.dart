@@ -73,7 +73,10 @@ class _AppBarWidgetState extends State<AppBarWidget> {
         ),
         actions: <Widget>[
           Center(
-            child: Icon(Icons.battery_std),
+            child: Icon(
+              Icons.battery_std,
+              size: 18,
+            ),
           ),
           Center(
             child: Text(_batteryLevel.toString() + "%"),

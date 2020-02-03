@@ -73,7 +73,7 @@ object Settings {
 
      fun initSystemSettingsFile(){
         try{
-            val file= File(A1POSSETTINGINIFILE)
+            val file = File(A1POSSETTINGINIFILE)
 
             if(!file.exists()){
                 if (file.createNewFile()) {
@@ -92,7 +92,7 @@ object Settings {
                 val runtime = Runtime.getRuntime()
                 runtime.exec(command)
 
-                readSettingsFile()
+                A1POSSETTINGS = readSettingsFile()
             }
         }catch(ex: Exception){
             println("FAILED TO AT initSystemSettingsFile() : ${ex.message}")
