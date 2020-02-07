@@ -1,4 +1,3 @@
-// import 'package:battery/battery.dart';
 import 'dart:async';
 
 import 'package:battery/battery.dart';

@@ -51,6 +51,8 @@ class SettlementScreenState extends State<SettlementScreen> {
           backgroundColor: Colors.grey[600],
           textColor: Colors.white,
           fontSize: 16.0);
+
+      isLoading = false;
     }
   }
 
@@ -60,32 +62,32 @@ class SettlementScreenState extends State<SettlementScreen> {
     super.dispose();
   }
 
-  void loadTransactionSummary() async {
+  Future<void> loadTransactionSummary() async {
     fullTransactionsList = new List<Transaction>();
 
-    await batchPlatformService.getTransactionSummary().then((val) {
-      if (val.isNotEmpty) {
-        var decodedTransResp = jsonDecode(val);
-        if (decodedTransResp["RETURN_CODE"] == "OK") {
-          var returnMessage = jsonDecode(decodedTransResp["RETURN_MSG"]);
+    var val = await batchPlatformService.getTransactionSummary();
 
-          transactionsTotalAmount = getTransactionsTotal(returnMessage);
+    if (val.isNotEmpty) {
+      var decodedTransResp = jsonDecode(val);
+      if (decodedTransResp["RETURN_CODE"] == "OK") {
+        var returnMessage = jsonDecode(decodedTransResp["RETURN_MSG"]);
 
-          loadTransactionDetails(PAGE_INDEX, PAGE_SIZE);
-        }
-      } else {
-        Fluttertoast.showToast(
-            msg: "Failed to load transactions!",
-            toastLength: Toast.LENGTH_SHORT,
-            gravity: ToastGravity.BOTTOM,
-            backgroundColor: Colors.grey[600],
-            textColor: Colors.white,
-            fontSize: 16.0);
+        transactionsTotalAmount = getTransactionsTotal(returnMessage);
+
+        loadTransactionDetails(PAGE_INDEX, PAGE_SIZE);
       }
-    });
+    } else {
+      Fluttertoast.showToast(
+          msg: "Failed to load transactions!",
+          toastLength: Toast.LENGTH_SHORT,
+          gravity: ToastGravity.BOTTOM,
+          backgroundColor: Colors.grey[600],
+          textColor: Colors.white,
+          fontSize: 16.0);
+    }
   }
 
-  void loadTransactionDetails(int pageIndex, int pageSize) async {
+  Future<void> loadTransactionDetails(int pageIndex, int pageSize) async {
     var tempTransList = new List<Transaction>();
 
     var transactions =
@@ -104,22 +106,6 @@ class SettlementScreenState extends State<SettlementScreen> {
             item["PaymentType"],
             item["Timestamp"],
             item["RefNum"]);
-
-        // var extData = item["ExtData"];
-
-        // extData = "<xml>" + extData.toString() + "</xml>";
-
-        // xml2json.parse(extData.toString());
-
-        // var extDataJson = jsonDecode(xml2json.toParker());
-
-        // var tipAmount = extDataJson["xml"]["TipAmount"];
-
-        // if (tipAmount != "0") {
-        //   transTmp.hasTip = true;
-        // } else {
-        //   transTmp.tipAmount = tipAmount;
-        // }
 
         tempTransList.add(transTmp);
       }

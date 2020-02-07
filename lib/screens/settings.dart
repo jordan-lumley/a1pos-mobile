@@ -2,9 +2,9 @@ import 'dart:async';
 import 'dart:convert';
 
 import 'package:a1pos/components/appbarwidget.dart';
-import 'package:a1pos/main.dart';
 import 'package:a1pos/models/CommSetting.dart';
 import 'package:a1pos/services/settings.dart';
+import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:fluttertoast/fluttertoast.dart';
@@ -21,8 +21,8 @@ class SettingsScreen extends StatefulWidget {
 
 class SettingsScreenState extends State<SettingsScreen> {
   CommSetting commSettings;
-  //var password = "duck basketball";
-  var password = "b";
+
+  var password = kReleaseMode ? "duck basketball" : "b";
   var settingsPlatformService = new SettingsPlatformService();
 
   var passwordController = TextEditingController();
@@ -185,8 +185,65 @@ class SettingsScreenState extends State<SettingsScreen> {
   String formatTimeOfDay(TimeOfDay tod) {
     final now = new DateTime.now();
     final dt = DateTime(now.year, now.month, now.day, tod.hour, tod.minute);
-    final format = DateFormat.jm(); //"6:00 AM"
+    final format = DateFormat.jm();
     return format.format(dt);
+  }
+
+  Future<void> viewLogs() async {
+    try {
+      var logs = await settingsPlatformService.getLogs();
+      var logsDecoded = jsonDecode(logs);
+
+      var returnMsg = logsDecoded[" RETURN_MSG"].toString();
+
+      var logsArray = jsonDecode(returnMsg);
+
+      if (logsArray != null) {
+        var children = logsArray
+            .map(
+              (f) => Text(
+                f,
+                style: TextStyle(fontSize: 12),
+              ),
+            )
+            .toList();
+
+        showDialog(
+          context: context,
+          builder: (BuildContext context) {
+            return AlertDialog(
+              title: Text("Logs"),
+              content: Container(
+                width: MediaQuery.of(context).size.width,
+                height: MediaQuery.of(context).size.height,
+                child: ListView(
+                  children: List.from(children),
+                ),
+              ),
+              actions: <Widget>[
+                MaterialButton(
+                  color: Colors.teal,
+                  onPressed: () {
+                    Navigator.pop(context);
+                  },
+                  child: Text('close'),
+                )
+              ],
+            );
+          },
+        );
+      } else {
+        Fluttertoast.showToast(
+            msg: "No Logs!",
+            toastLength: Toast.LENGTH_SHORT,
+            gravity: ToastGravity.BOTTOM,
+            backgroundColor: Colors.grey[600],
+            textColor: Colors.white,
+            fontSize: 16.0);
+      }
+    } catch (err) {
+      print(err);
+    }
   }
 
   @override
@@ -330,6 +387,19 @@ class SettingsScreenState extends State<SettingsScreen> {
                                           color: Colors.teal,
                                           child: Icon(
                                             Icons.print,
+                                            color: Colors.white,
+                                          ),
+                                        ),
+                                      ),
+                                      Padding(
+                                        padding: EdgeInsets.all(10),
+                                        child: MaterialButton(
+                                          onPressed: () async {
+                                            await viewLogs();
+                                          },
+                                          color: Colors.teal,
+                                          child: Icon(
+                                            Icons.view_list,
                                             color: Colors.white,
                                           ),
                                         ),

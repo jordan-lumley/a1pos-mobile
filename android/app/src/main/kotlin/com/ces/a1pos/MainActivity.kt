@@ -41,10 +41,14 @@ class MainActivity : FlutterActivity() {
 
         window.setFlags(WindowManager.LayoutParams.FLAG_FULLSCREEN, WindowManager.LayoutParams.FLAG_FULLSCREEN)
 
+        window.addFlags(WindowManager.LayoutParams.FLAG_KEEP_SCREEN_ON)
+
         init()
 
         val CHANNEL = "flutter.a1pos.com.channel"
+
         val methodChannel = MethodChannel(flutterEngine?.dartExecutor?.binaryMessenger, CHANNEL)
+
         methodChannel.setMethodCallHandler { methodCall, result ->
             val size = RUNNING_POSLINKS.size
             for (i in 0 until size) {
@@ -174,7 +178,6 @@ class MainActivity : FlutterActivity() {
 
         LogSetting.setLevel(LogSetting.LOGLEVEL.DEBUG)
         LogSetting.setLogMode(true)
-
 
         Settings.initSystemSettingsFile()
     }
@@ -321,8 +324,6 @@ class MainActivity : FlutterActivity() {
                         paymentReceiptData.put("ApprovedAmount", posLink.PaymentResponse.ApprovedAmount)
                         paymentReceiptData.put("CardType", posLink.PaymentResponse.CardType)
                         paymentReceiptData.put("TransactionType", transType)
-
-//                        printTransactionAsync()
 
                         printTransactionAsync(posLink.PaymentResponse, transType)
 
@@ -665,15 +666,15 @@ class MainActivity : FlutterActivity() {
                 } else {
                     if(!isFromDialog){
                         val showDialogRequest = ShowDialogRequest()
-                        showDialogRequest.setTitle("Tear Receipt")
-                        showDialogRequest.setButton1("Ok")
-                        showDialogRequest.setButton2("Cancel")
+                        showDialogRequest.setTitle("Print Customer Receipt?")
+                        showDialogRequest.setButton1("Yes")
+                        showDialogRequest.setButton2("No")
 
                         val result = ShowDialog.showDialog(this, showDialogRequest, posLink.GetCommSetting())
                         if (result.buttonNum == "1") {
                             printTransactionAsync(paymentResponse, origTransType, true)
                         }else{
-                                return
+                            return
                         }
                     }
                 }
@@ -1033,20 +1034,16 @@ class MainActivity : FlutterActivity() {
         return tmp.toString()
     }
 
-    fun r(f: () -> Unit): Runnable = Runnable { f() }
+    private fun r(f: () -> Unit): Runnable = Runnable { f() }
 
     private fun convertStringToXMLDocument(xmlString: String): org.w3c.dom.Document? {
         val xmlStringWithRoot = "<root>$xmlString</root>"
-        //Parser that produces DOM object trees from XML content
         val factory = DocumentBuilderFactory.newInstance()
 
-        //API to obtain DOM Document instance
         var builder: DocumentBuilder?
         try {
-            //Create DocumentBuilder with default configuration
             builder = factory.newDocumentBuilder()
 
-            //Parse the content to Document object
             return builder!!.parse(InputSource(StringReader(xmlStringWithRoot)))
         } catch (e: Exception) {
             e.printStackTrace()
@@ -1054,5 +1051,4 @@ class MainActivity : FlutterActivity() {
 
         return null
     }
-
 }
