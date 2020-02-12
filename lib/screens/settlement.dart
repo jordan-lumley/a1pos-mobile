@@ -23,6 +23,7 @@ class SettlementScreen extends StatefulWidget {
 class SettlementScreenState extends State<SettlementScreen> {
   var PAGE_SIZE = 6;
   var PAGE_INDEX = 1;
+
   var fullTransactionsList = new List<Transaction>();
   var isLoading = true;
   var isLoadingMore = true;
@@ -41,16 +42,11 @@ class SettlementScreenState extends State<SettlementScreen> {
   @override
   void initState() {
     super.initState();
+
     try {
       loadTransactionSummary();
     } catch (err) {
-      Fluttertoast.showToast(
-          msg: "Failed to load transactions!",
-          toastLength: Toast.LENGTH_SHORT,
-          gravity: ToastGravity.BOTTOM,
-          backgroundColor: Colors.grey[600],
-          textColor: Colors.white,
-          fontSize: 16.0);
+      showGenericError();
 
       isLoading = false;
     }
@@ -58,32 +54,36 @@ class SettlementScreenState extends State<SettlementScreen> {
 
   @override
   void dispose() {
-    controller.dispose();
     super.dispose();
+
+    controller.dispose();
   }
 
   Future<void> loadTransactionSummary() async {
-    fullTransactionsList = new List<Transaction>();
+    try {
+      fullTransactionsList = new List<Transaction>();
 
-    var val = await batchPlatformService.getTransactionSummary();
+      var response = await batchPlatformService.getTransactionSummary();
 
-    if (val.isNotEmpty) {
-      var decodedTransResp = jsonDecode(val);
-      if (decodedTransResp["RETURN_CODE"] == "OK") {
-        var returnMessage = jsonDecode(decodedTransResp["RETURN_MSG"]);
+      if (response.isNotEmpty) {
+        var decodedTransResp = jsonDecode(response);
+        if (decodedTransResp["RETURN_CODE"] == "OK") {
+          var returnMessage = jsonDecode(decodedTransResp["RETURN_MSG"]);
 
-        transactionsTotalAmount = getTransactionsTotal(returnMessage);
+          var total = getTransactionsTotal(returnMessage);
 
-        loadTransactionDetails(PAGE_INDEX, PAGE_SIZE);
+          await loadTransactionDetails(PAGE_INDEX, PAGE_SIZE);
+
+          setState(() {
+            transactionsTotalAmount = total;
+            isLoading = false;
+          });
+        }
+      } else {
+        transactionsTotalAmount = formatCurrency("0");
       }
-    } else {
-      Fluttertoast.showToast(
-          msg: "Failed to load transactions!",
-          toastLength: Toast.LENGTH_SHORT,
-          gravity: ToastGravity.BOTTOM,
-          backgroundColor: Colors.grey[600],
-          textColor: Colors.white,
-          fontSize: 16.0);
+    } catch (err) {
+      showGenericError();
     }
   }
 
@@ -111,40 +111,38 @@ class SettlementScreenState extends State<SettlementScreen> {
       }
     }
 
-    setState(() {
-      isLoading = false;
-      isLoadingMore = false;
-    });
+    isLoading = false;
+    isLoadingMore = false;
 
     fullTransactionsList.addAll(tempTransList);
   }
 
-  void handleBatchSettle() {
+  Future<void> handleBatchSettle() async {
     dialogs.confirm(context, () async {
       try {
-        await batchPlatformService.closeBatch().then((val) {
-          var decodedJson = jsonDecode(val);
-          if (decodedJson["RETURN_CODE"] == "OK") {
-            Navigator.pop(context);
+        var response = await batchPlatformService.closeBatch();
 
-            PAGE_INDEX = 1;
+        var decodedJson = jsonDecode(response);
+        if (decodedJson["RETURN_CODE"] == "OK") {
+          Navigator.pop(context);
 
-            Fluttertoast.showToast(
-                msg: "Successfully Settled!",
-                toastLength: Toast.LENGTH_SHORT,
-                gravity: ToastGravity.BOTTOM,
-                backgroundColor: Colors.grey[600],
-                textColor: Colors.white,
-                fontSize: 16.0);
+          PAGE_INDEX = 1;
 
-            setState(() {
-              isLoading = true;
-              totalRecords = 0;
-            });
+          Fluttertoast.showToast(
+              msg: "Successfully Settled!",
+              toastLength: Toast.LENGTH_SHORT,
+              gravity: ToastGravity.BOTTOM,
+              backgroundColor: Colors.grey[600],
+              textColor: Colors.white,
+              fontSize: 16.0);
 
-            loadTransactionSummary();
-          }
-        });
+          setState(() {
+            isLoading = true;
+            totalRecords = 0;
+          });
+
+          await loadTransactionSummary();
+        }
       } catch (ex) {
         Fluttertoast.showToast(
             msg: "Failed to settle batch! exception: ex",
@@ -157,27 +155,41 @@ class SettlementScreenState extends State<SettlementScreen> {
     }, "Settle Batch", "Are you sure you want to settle your batch?");
   }
 
-  void handleTransactionAdjusment(String transId) {
+  Future<void> handleTransactionAdjusment(String transId) async {
     dialogs.transactionAdjustment(context, controller, () async {
-      await batchPlatformService
-          .adjustTransaction(controller.text, transId)
-          .then((val) {
-        var decodedJson = jsonDecode(val);
-        if (decodedJson["RETURN_CODE"] == "OK") {
-          Navigator.pop(context);
+      var response = await batchPlatformService.adjustTransaction(
+          controller.text, transId);
 
-          Navigator.pushReplacementNamed(context, "/settlements");
+      var decodedJson = jsonDecode(response);
+      if (decodedJson["RETURN_CODE"] == "OK") {
+        Navigator.pop(context);
 
-          Fluttertoast.showToast(
-              msg: "Successfully Adjusted!",
-              toastLength: Toast.LENGTH_SHORT,
-              gravity: ToastGravity.BOTTOM,
-              backgroundColor: Colors.grey[600],
-              textColor: Colors.white,
-              fontSize: 16.0);
-        }
-      });
+        Navigator.pushReplacementNamed(context, "/settlements");
+
+        Fluttertoast.showToast(
+            msg: "Successfully Adjusted!",
+            toastLength: Toast.LENGTH_SHORT,
+            gravity: ToastGravity.BOTTOM,
+            backgroundColor: Colors.grey[600],
+            textColor: Colors.white,
+            fontSize: 16.0);
+      }
     }, "Adjust Transaction #" + transId, "Amount to adjust");
+  }
+
+  void showGenericError() {
+    Fluttertoast.showToast(
+        msg: "Failed to load transactions!",
+        toastLength: Toast.LENGTH_SHORT,
+        gravity: ToastGravity.BOTTOM,
+        backgroundColor: Colors.grey[600],
+        textColor: Colors.white,
+        fontSize: 16.0);
+
+    setState(() {
+      transactionsTotalAmount = formatCurrency("0");
+      isLoading = false;
+    });
   }
 
   @override
@@ -350,14 +362,44 @@ class SettlementScreenState extends State<SettlementScreen> {
   }
 
   String getTransactionsTotal(dynamic json) {
+    var amtList = List<dynamic>();
+
     var debitAmt = json["DebitAmount"] == "" ? 0 : json["DebitAmount"];
     var creditAmt = json["CreditAmount"] == "" ? 0 : json["CreditAmount"];
-    var visaAmt = json["VisaAmount"];
-    var amexAmt = json["AMEXAmount"];
-    var checkAmt = json["CHECKAmount"];
+    var visaAmt = json["VisaAmount"] == "" ? 0 : json["VisaAmount"];
+    var amexAmt = json["AMEXAmount"] == "" ? 0 : json["AMEXAmount"];
 
-    var creditAmount = formatCurrency(creditAmt);
-    return creditAmount;
+    amtList.add(debitAmt);
+    amtList.add(creditAmt);
+    amtList.add(amexAmt);
+    amtList.add(visaAmt);
+
+    var finalTotal = sumAmt(amtList);
+
+    return formatCurrency(finalTotal);
+  }
+
+  String sumAmt(List<dynamic> arr) {
+    int amount = 0;
+
+    for (var elem in arr) {
+      try {
+        switch (elem.runtimeType) {
+          case String:
+            amount += int.parse(elem);
+            break;
+          case int:
+            amount += elem;
+            break;
+          case double:
+            amount += int.parse(elem);
+            break;
+        }
+      } catch (err) {
+        print(err);
+      }
+    }
+    return amount.toString();
   }
 
   Widget getTransactionCard(Transaction transaction) {

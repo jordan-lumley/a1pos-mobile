@@ -56,9 +56,21 @@ object Settings {
         val ini = IniFile(fileName)
         ini.setSection(SectionComm)
 
-        val commsetting = CommSetting()
-        commsetting.timeOut = ini.read(TagTimeout, Deft)
-        commsetting.type = ini.read(TagComm, Deft)
+        val commSetting = CommSetting()
+
+        val timeOut = ini.read(TagTimeout, Deft)
+        commSetting.timeOut = if(timeOut.isEmpty()){
+            "60000"
+        }else{
+            timeOut
+        }
+
+        val commType = ini.read(TagComm, Deft)
+        commSetting.type = if(timeOut.isEmpty()){
+            "AIDL"
+        }else{
+            commType
+        }
         //        commsetting.setSerialPort(ini.read(TagPortnum, Deft));
         //        commsetting.setBaudRate(ini.read(TagBaudrate, Deft));
         //        commsetting.setDestIP(ini.read(TagIp, Deft));
@@ -68,7 +80,7 @@ object Settings {
         //        if (!TextUtils.isEmpty(enableProxy)) {
         //            commsetting.setEnableProxy(Boolean.parseBoolean(enableProxy));
         //        }
-        return commsetting
+        return commSetting
     }
 
      fun initSystemSettingsFile(){

@@ -163,8 +163,14 @@ class MainActivity : FlutterActivity() {
 
         val commSetting = Settings.getCommSettingFromFile(SETTINGINIFILE.toString())
 
-        commSetting.type = CommSetting.AIDL
-        commSetting.timeOut = "60000"
+//        if(commSetting.type.isEmpty()){
+//            commSetting.type = CommSetting.AIDL
+//        }
+//
+//        if(commSetting.timeOut.isEmpty()){
+//            commSetting.timeOut = "60000"
+//        }
+
         //        commSetting.setSerialPort("COM1");
         //        commSetting.setBaudRate("9600");
         //        commSetting.setDestIP("172.16.20.15");
@@ -230,8 +236,6 @@ class MainActivity : FlutterActivity() {
         return r {
             try {
                 val isNavigationBarEnabled = MiscSettings.isNavigationBarEnable(applicationContext)
-                //                boolean isHomeKeyEnabled = MiscSettings.isHomeKeyEnable(getApplicationContext());
-                //                boolean isRecentKeyEnabled = MiscSettings.isRecentKeyEnable(getApplicationContext());
 
                 val a1posSetting = Settings.readSettingsFile()
 
@@ -550,22 +554,14 @@ class MainActivity : FlutterActivity() {
             val fmtr = POSLinkPrinter.PrintDataFormatter()
 
             val l = ArrayList<String>()
-            l.add(batchResponse.CashAmount)
             l.add(batchResponse.CreditAmount)
             l.add(batchResponse.DebitAmount)
-            l.add(batchResponse.CHECKAmount)
-            l.add(batchResponse.EBTAmount)
-            l.add(batchResponse.GiftAmount)
 
             val totalAmount = arraySumToCurrency(l)
 
             val c = ArrayList<String>()
-            c.add(batchResponse.CashCount)
             c.add(batchResponse.CreditCount)
             c.add(batchResponse.DebitCount)
-            c.add(batchResponse.CHECKCount)
-            c.add(batchResponse.EBTCount)
-            c.add(batchResponse.GiftCount)
 
             val totalCount = arraySum(c)
 
@@ -592,30 +588,14 @@ class MainActivity : FlutterActivity() {
                     .addLineSeparator()
                     .addLeftAlign().addContent("Credit Count: ").addRightAlign().addContent(if (batchResponse.CreditCount.isEmpty()) "0" else batchResponse.CreditCount)
                     .addLineSeparator()
-                    .addLeftAlign().addContent("Cash Count: ").addRightAlign().addContent(if (batchResponse.CashCount.isEmpty()) "0" else batchResponse.CashCount)
-                    .addLineSeparator()
                     .addLeftAlign().addContent("Debit Count: ").addRightAlign().addContent(if (batchResponse.DebitCount.isEmpty()) "0" else batchResponse.DebitCount)
-                    .addLineSeparator()
-                    .addLeftAlign().addContent("Gift Count: ").addRightAlign().addContent(if (batchResponse.GiftCount.isEmpty()) "0" else batchResponse.GiftCount)
-                    .addLineSeparator()
-                    .addLeftAlign().addContent("EBT Count: ").addRightAlign().addContent(if (batchResponse.EBTCount.isEmpty()) "0" else batchResponse.EBTCount)
-                    .addLineSeparator()
-                    .addLeftAlign().addContent("CHECK Count: ").addRightAlign().addContent(if (batchResponse.CHECKCount.isEmpty()) "0" else batchResponse.CHECKCount)
                     .addLineSeparator()
                     .addLeftAlign().addContent("TOTAL Count: ").addRightAlign().addContent(totalCount)
                     .addLineSeparator()
                     .addLineSeparator()
-                    .addLeftAlign().addContent("Cash Amount: ").addRightAlign().addContent(formatCurrency(batchResponse.CashAmount))
-                    .addLineSeparator()
                     .addLeftAlign().addContent("Credit Amount: ").addRightAlign().addContent(formatCurrency(batchResponse.CreditAmount))
                     .addLineSeparator()
                     .addLeftAlign().addContent("Debit Amount: ").addRightAlign().addContent(formatCurrency(batchResponse.DebitAmount))
-                    .addLineSeparator()
-                    .addLeftAlign().addContent("Gift Amount: ").addRightAlign().addContent(formatCurrency(batchResponse.GiftAmount))
-                    .addLineSeparator()
-                    .addLeftAlign().addContent("EBT Amount: ").addRightAlign().addContent(formatCurrency(batchResponse.EBTAmount))
-                    .addLineSeparator()
-                    .addLeftAlign().addContent("CHECK Amount: ").addRightAlign().addContent(formatCurrency(batchResponse.CHECKAmount))
                     .addLineSeparator()
                     .addLeftAlign().addContent("TOTAL Amount: ").addRightAlign().addContent(totalAmount)
                     .addHeader()
@@ -1011,9 +991,9 @@ class MainActivity : FlutterActivity() {
     private fun arraySumToCurrency(arrToSum: ArrayList<*>): String {
         var tmp = 0
         for (i in arrToSum.indices) {
-            val `val` = arrToSum[i].toString()
-            if (!`val`.isEmpty()) {
-                val a = Integer.parseInt(`val`)
+            val value = arrToSum[i].toString()
+            if (value.isNotEmpty()) {
+                val a = Integer.parseInt(value)
                 tmp += a
             }
         }
