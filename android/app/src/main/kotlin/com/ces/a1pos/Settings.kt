@@ -1,9 +1,6 @@
 package com.ces.a1pos
 
-import android.os.Environment
 import com.pax.poslink.CommSetting
-import com.pax.poslink.LogSetting
-
 import java.io.File
 import java.io.FileReader
 import java.io.FileWriter
@@ -21,7 +18,7 @@ object Settings {
 
     var A1POSSETTINGINIFILE = "z"
 
-    var LOGSETTINGINIPATH = ""
+    var BROADPOSLOGSETTINGINIPATH = ""
 
     private val Deft = ""
 

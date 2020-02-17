@@ -47,10 +47,6 @@ class SettingsPlatformService {
     return await platform.invokeMethod('TEST_PRINT');
   }
 
-  Future<String> getLogs() async {
-    return await platform.invokeMethod('GET_LOGS');
-  }
-
   // Future<String> getAutoBatchStatus() async {
   //   return await storage.read(key: "autoBatchStatus");
   // }

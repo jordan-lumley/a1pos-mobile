@@ -62,6 +62,24 @@ class MainActivity : FlutterActivity() {
             }
 
             when (methodCall.method.toUpperCase()) {
+                "INIT" -> {
+                    if (methodCall.arguments != null) {
+                        try{
+                            val argsArr = methodCall.arguments<ArrayList<*>>()
+                            val logDirectory = argsArr[0].toString()
+                            val logFilePath = argsArr[1].toString()
+
+                            val file = File(logFilePath)
+
+                            Logger.LOGFILE = file
+                            Logger.LOGDIRECTORY = logDirectory
+                        }catch(ex: java.lang.Exception){
+                            println(ex)
+                        }
+
+                        result.success("Ok")
+                    }
+                }
                 "SALE" -> {
                     var saleAmount = ""
                     if (methodCall.arguments != null) {
@@ -136,15 +154,6 @@ class MainActivity : FlutterActivity() {
                     val editTask = editTransactionAsync(editAmount, transId, result)
                     Thread(editTask).start()
                 }
-                "GET_LOGS" -> {
-                    val logsContent = getLogs()
-
-                    val GSON = Gson()
-
-                    val logContentsJson = GSON.toJson(logsContent)
-
-                    result.success(GSON.toJson(ChannelReturnResponse("OK", logContentsJson)))
-                }
                 "SET_TIP_SHOWN_SETTINGS" -> if (methodCall.arguments != null) {
                     val tipStatus = methodCall.arguments.toString()
                     val tipSettingsTask = setTipEnabledAsync(tipStatus, result)
@@ -157,7 +166,7 @@ class MainActivity : FlutterActivity() {
 
     private fun init() {
         SETTINGINIFILE = applicationContext.filesDir.absolutePath + "/" + Settings.FILENAME
-        Settings.LOGSETTINGINIPATH = context.filesDir.path.toString() + "/logs"
+        Settings.BROADPOSLOGSETTINGINIPATH = context.filesDir.path.toString() + "/logs"
         Settings.A1POSSETTINGINIFILE = context.filesDir.path.toString() + "/A1POSSystemSettings.ini"
 
 
@@ -180,7 +189,7 @@ class MainActivity : FlutterActivity() {
 
         Settings.saveCommSettingToFile(SETTINGINIFILE.toString(), commSetting)
 
-        LogSetting.setOutputPath(Settings.LOGSETTINGINIPATH)
+        LogSetting.setOutputPath(Settings.BROADPOSLOGSETTINGINIPATH)
 
         LogSetting.setLevel(LogSetting.LOGLEVEL.DEBUG)
         LogSetting.setLogMode(true)
@@ -208,6 +217,8 @@ class MainActivity : FlutterActivity() {
                     RESULT.success(GSON.toJson(ChannelReturnResponse("OK", "SUCCESS")))
                 }
             } catch (e: Exception) {
+                Logger.error("setNavBarSettingsAsync() ${e.message!!}")
+
                 errorOnUiThread("FAILED TO LOAD SETTINGS FILE", RESULT)
             }
         }
@@ -226,6 +237,8 @@ class MainActivity : FlutterActivity() {
                     RESULT.success(GSON.toJson(ChannelReturnResponse("OK", "SUCCESS")))
                 }
             } catch (e: Exception) {
+                Logger.error("setTipEnabledAsync() ${e.message!!}")
+
                 errorOnUiThread("FAILED TO LOAD SETTINGS FILE", RESULT)
             }
         }
@@ -249,6 +262,8 @@ class MainActivity : FlutterActivity() {
                     RESULT.success(GSON.toJson(ChannelReturnResponse("OK", cSetAsJson.toString())))
                 }
             } catch (e: Exception) {
+                Logger.error("getSystemSettings() ${e.message!!}")
+
                 errorOnUiThread("FAILED TO LOAD SETTINGS FILE", RESULT)
             }
         }
@@ -270,6 +285,8 @@ class MainActivity : FlutterActivity() {
                     RESULT.success(GSON.toJson(ChannelReturnResponse("OK", cSetAsJson.toString())))
                 }
             } catch (e: Exception) {
+                Logger.error("getCommSettingsAsync() ${e.message!!}")
+
                 errorOnUiThread("FAILED TO LOAD SETTINGS FILE", RESULT)
             }
         }
@@ -291,6 +308,8 @@ class MainActivity : FlutterActivity() {
                     RESULT.success(GSON.toJson(ChannelReturnResponse("OK", GSON.toJson(cSet))))
                 }
             } catch (e: Exception) {
+                Logger.error("saveCommSettingsAsync() ${e.message!!}")
+
                 errorOnUiThread("FAILED TO LOAD SETTINGS FILE", RESULT)
             }
         }
@@ -336,46 +355,54 @@ class MainActivity : FlutterActivity() {
                             RESULT.success(GSON.toJson(ChannelReturnResponse("OK", "Success")))
                         }
                     } else {
+                        Logger.info("processTransactionAsync() ${posLink.PaymentResponse.Message}" )
+                        Logger.info("processTransactionAsync() ${posLink.PaymentResponse.HostResponse}" )
+
                         errorOnUiThread("TRANSACTION DECLINED", RESULT)
                     }
                 } else {
+                    Logger.info("processTransactionAsync() ${posLink.PaymentResponse.Message}" )
+                    Logger.info("processTransactionAsync() ${posLink.PaymentResponse.HostResponse}" )
+
                     errorOnUiThread("TRANSACTION DECLINED", RESULT)
                 }
             } catch (e: Exception) {
+                Logger.error("processTransactionAsync() ${e.message!!}")
+
                 errorOnUiThread("TRANSACTION DECLINED", RESULT)
             }
         }
     }
 
-    private fun getLogs(): ArrayList<String> {
-        var linesOfText = ArrayList<String>()
-
-        try {
-            val directory = File(Settings.LOGSETTINGINIPATH)
-            val files = directory.listFiles()
-
-
-            for (file in files) {
-                linesOfText.add("-------------------- START OF ${file.name}--------------------")
-                val myReader = Scanner(file)
-                while (myReader.hasNextLine()) {
-                    val data = myReader.nextLine()
-                    linesOfText.add(data)
-                }
-                myReader.close()
-
-                linesOfText.add("-------------------- END OF ${file.name}--------------------")
-            }
-
-            return linesOfText
-        } catch (ex: Exception) {
-            var blah = ex.message
-        }
-
-        linesOfText.add("failed to get logs")
-
-        return linesOfText
-    }
+//    private fun getLogs(): ArrayList<String> {
+//        var linesOfText = ArrayList<String>()
+//
+//        try {
+//            val directory = File(Settings)
+//            val files = directory.listFiles()
+//
+//
+//            for (file in files) {
+//                linesOfText.add("-------------------- START OF ${file.name}--------------------")
+//                val myReader = Scanner(file)
+//                while (myReader.hasNextLine()) {
+//                    val data = myReader.nextLine()
+//                    linesOfText.add(data)
+//                }
+//                myReader.close()
+//
+//                linesOfText.add("-------------------- END OF ${file.name}--------------------")
+//            }
+//
+//            return linesOfText
+//        } catch (ex: Exception) {
+//            Logger.error(ex.message!!)
+//        }
+//
+//        linesOfText.add("failed to get logs")
+//
+//        return linesOfText
+//    }
 
     private fun refundTransactionAsync(amount: String, RESULT: MethodChannel.Result): Runnable {
         return r {
@@ -409,12 +436,20 @@ class MainActivity : FlutterActivity() {
                             RESULT.success(GSON.toJson(ChannelReturnResponse("OK", "Success")))
                         }
                     } else {
+                        Logger.info("refundTransactionAsync() ${posLink.PaymentResponse.Message}" )
+                        Logger.info("refundTransactionAsync() ${posLink.PaymentResponse.HostResponse}" )
+
                         errorOnUiThread("TRANSACTION DECLINED", RESULT)
                     }
                 } else {
+                    Logger.info(posLink.PaymentResponse.Message)
+                    Logger.info(posLink.PaymentResponse.HostResponse)
+
                     errorOnUiThread("TRANSACTION DECLINED", RESULT)
                 }
             } catch (e: Exception) {
+                Logger.error("refundTransactionAsync() ${e.message!!}")
+
                 errorOnUiThread("TRANSACTION DECLINED", RESULT)
             }
         }
@@ -445,10 +480,14 @@ class MainActivity : FlutterActivity() {
                     }
                     //                    printTransaction("", transType);
                 } else {
+                    Logger.info("getTransactionsSummaryAsync() ${posLink.ReportResponse.HostResponse}" )
+                    Logger.info("getTransactionsSummaryAsync() ${posLink.ReportResponse.Message}" )
+
                     errorOnUiThread("TRANSACTION DECLINED", RESULT)
                 }
             } catch (e: Exception) {
-                val blah = e
+                Logger.error("getTransactionsSummaryAsync() ${e.message!!}")
+
                 errorOnUiThread("TRANSACTION DECLINED", RESULT)
             }
         }
@@ -502,10 +541,14 @@ class MainActivity : FlutterActivity() {
                         RESULT.success(GSON.toJson(ChannelReturnResponse("OK", returnMsg)))
                     }
                 } else {
+                    Logger.info("getTransactionsDetailsAsync() ${posLink.ReportResponse.HostResponse}" )
+                    Logger.info("getTransactionsDetailsAsync() ${posLink.ReportResponse.Message}" )
+
                     errorOnUiThread("TRANSACTION DECLINED", RESULT)
                 }
             } catch (e: Exception) {
-                val blah = e
+                Logger.error("getTransactionsDetailsAsync() ${e.message!!}")
+
                 errorOnUiThread("TRANSACTION DECLINED", RESULT)
             }
         }
@@ -534,10 +577,14 @@ class MainActivity : FlutterActivity() {
                         RESULT.success(GSON.toJson(ChannelReturnResponse("OK", returnMsg)))
                     }
                 } else {
+                    Logger.info("closeBatchAsync() ${posLink.BatchResponse.Message}" )
+                    Logger.info("closeBatchAsync() ${posLink.BatchResponse.HostResponse}" )
+
                     errorOnUiThread("FAILED TO CLOSE BATCH", RESULT)
                 }
             } catch (e: Exception) {
-                val blah = e
+                Logger.error("closeBatchAsync() ${e.message!!}")
+
                 errorOnUiThread("FAILED TO CLOSE BATCH", RESULT)
             }
         }
@@ -617,9 +664,14 @@ class MainActivity : FlutterActivity() {
                     throw Error("FAILED TO PRINT")
                 }
             } else {
+                Logger.info("printBatchAsync() ${posLink.ManageResponse.AuthorizationResult}" )
+                Logger.info("printBatchAsync() ${posLink.ManageResponse.ResultTxt}" )
+
                 throw Error("FAILED TO PRINT")
             }
         } catch (e: Exception) {
+            Logger.error("printBatchAsync() ${e.message!!}")
+
             throw Error("FAILED TO PRINT")
         }
 
@@ -659,9 +711,14 @@ class MainActivity : FlutterActivity() {
                     }
                 }
             } else {
+                Logger.info("printTransactionAsync() ${posLink.ManageResponse.AuthorizationResult}" )
+                Logger.info("printTransactionAsync() ${posLink.ManageResponse.ResultTxt}" )
+
                 throw Error("FAILED TO PRINT")
             }
         } catch (e: Exception) {
+            Logger.error("printTransactionAsync() ${e.message!!}")
+
             throw Error("FAILED TO PRINT")
         }
     }
@@ -949,12 +1006,20 @@ class MainActivity : FlutterActivity() {
                             RESULT.success(GSON.toJson(ChannelReturnResponse("OK", "Success")))
                         }
                     } else {
+                        Logger.info("editTransactionAsync() ${posLink.PaymentResponse.Message}" )
+                        Logger.info("editTransactionAsync() ${posLink.PaymentResponse.HostResponse}" )
+
                         errorOnUiThread("TRANSACTION DECLINED", RESULT)
                     }
                 } else {
+                    Logger.info("editTransactionAsync() ${posLink.PaymentResponse.Message}" )
+                    Logger.info("editTransactionAsync() ${posLink.PaymentResponse.HostResponse}" )
+
                     errorOnUiThread("TRANSACTION DECLINED", RESULT)
                 }
             } catch (e: Exception) {
+                Logger.error("editTransactionAsync() ${e.message!!}")
+
                 errorOnUiThread("TRANSACTION DECLINED", RESULT)
             }
         }
@@ -1027,6 +1092,7 @@ class MainActivity : FlutterActivity() {
             return builder!!.parse(InputSource(StringReader(xmlStringWithRoot)))
         } catch (e: Exception) {
             e.printStackTrace()
+            Logger.error(e.message!!)
         }
 
         return null

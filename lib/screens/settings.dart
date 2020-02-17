@@ -3,6 +3,7 @@ import 'dart:convert';
 
 import 'package:a1pos/components/appbarwidget.dart';
 import 'package:a1pos/models/CommSetting.dart';
+import 'package:a1pos/services/logger.dart';
 import 'package:a1pos/services/settings.dart';
 import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
@@ -189,62 +190,59 @@ class SettingsScreenState extends State<SettingsScreen> {
     return format.format(dt);
   }
 
-  Future<void> viewLogs() async {
-    try {
-      var logs = await settingsPlatformService.getLogs();
-      var logsDecoded = jsonDecode(logs);
+  // Future<void> viewLogs() async {
+  //   try {
+  //     var log = Logger.logFile;
 
-      var returnMsg = logsDecoded[" RETURN_MSG"].toString();
+  //     var logsArray = log.readAsLinesSync();
 
-      var logsArray = jsonDecode(returnMsg);
+  //     if (logsArray != null) {
+  //       var children = logsArray
+  //           .map(
+  //             (f) => Text(
+  //               f,
+  //               style: TextStyle(fontSize: 12),
+  //             ),
+  //           )
+  //           .toList();
 
-      if (logsArray != null) {
-        var children = logsArray
-            .map(
-              (f) => Text(
-                f,
-                style: TextStyle(fontSize: 12),
-              ),
-            )
-            .toList();
-
-        showDialog(
-          context: context,
-          builder: (BuildContext context) {
-            return AlertDialog(
-              title: Text("Logs"),
-              content: Container(
-                width: MediaQuery.of(context).size.width,
-                height: MediaQuery.of(context).size.height,
-                child: ListView(
-                  children: List.from(children),
-                ),
-              ),
-              actions: <Widget>[
-                MaterialButton(
-                  color: Colors.teal,
-                  onPressed: () {
-                    Navigator.pop(context);
-                  },
-                  child: Text('close'),
-                )
-              ],
-            );
-          },
-        );
-      } else {
-        Fluttertoast.showToast(
-            msg: "No Logs!",
-            toastLength: Toast.LENGTH_SHORT,
-            gravity: ToastGravity.BOTTOM,
-            backgroundColor: Colors.grey[600],
-            textColor: Colors.white,
-            fontSize: 16.0);
-      }
-    } catch (err) {
-      print(err);
-    }
-  }
+  //       showDialog(
+  //         context: context,
+  //         builder: (BuildContext context) {
+  //           return AlertDialog(
+  //             title: Text("Logs"),
+  //             content: Container(
+  //               width: MediaQuery.of(context).size.width,
+  //               height: MediaQuery.of(context).size.height,
+  //               child: ListView(
+  //                 children: List.from(children),
+  //               ),
+  //             ),
+  //             actions: <Widget>[
+  //               MaterialButton(
+  //                 color: Colors.teal,
+  //                 onPressed: () {
+  //                   Navigator.pop(context);
+  //                 },
+  //                 child: Text('close'),
+  //               )
+  //             ],
+  //           );
+  //         },
+  //       );
+  //     } else {
+  //       Fluttertoast.showToast(
+  //           msg: "No Logs!",
+  //           toastLength: Toast.LENGTH_SHORT,
+  //           gravity: ToastGravity.BOTTOM,
+  //           backgroundColor: Colors.grey[600],
+  //           textColor: Colors.white,
+  //           fontSize: 16.0);
+  //     }
+  //   } catch (err) {
+  //     print(err);
+  //   }
+  // }
 
   @override
   Widget build(BuildContext context) {
@@ -391,19 +389,19 @@ class SettingsScreenState extends State<SettingsScreen> {
                                           ),
                                         ),
                                       ),
-                                      Padding(
-                                        padding: EdgeInsets.all(10),
-                                        child: MaterialButton(
-                                          onPressed: () async {
-                                            await viewLogs();
-                                          },
-                                          color: Colors.teal,
-                                          child: Icon(
-                                            Icons.view_list,
-                                            color: Colors.white,
-                                          ),
-                                        ),
-                                      ),
+                                      // Padding(
+                                      //   padding: EdgeInsets.all(10),
+                                      //   child: MaterialButton(
+                                      //     onPressed: () async {
+                                      //       await viewLogs();
+                                      //     },
+                                      //     color: Colors.teal,
+                                      //     child: Icon(
+                                      //       Icons.view_list,
+                                      //       color: Colors.white,
+                                      //     ),
+                                      //   ),
+                                      // ),
                                     ],
                                   ),
                                 ],

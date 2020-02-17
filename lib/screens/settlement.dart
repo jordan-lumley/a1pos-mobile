@@ -4,6 +4,7 @@ import 'package:a1pos/components/appbarwidget.dart';
 import 'package:a1pos/components/dialogs.dart';
 import 'package:a1pos/models/Transaction.dart';
 import 'package:a1pos/services/batch.dart';
+import 'package:a1pos/services/logger.dart';
 import 'package:flutter/cupertino.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_masked_text/flutter_masked_text.dart';
@@ -48,6 +49,8 @@ class SettlementScreenState extends State<SettlementScreen> {
     } catch (err) {
       showGenericError();
 
+      Logger.error(err);
+
       isLoading = false;
     }
   }
@@ -84,6 +87,7 @@ class SettlementScreenState extends State<SettlementScreen> {
       }
     } catch (err) {
       showGenericError();
+      Logger.error(err);
     }
   }
 
@@ -144,6 +148,8 @@ class SettlementScreenState extends State<SettlementScreen> {
           await loadTransactionSummary();
         }
       } catch (ex) {
+        Logger.error(ex);
+
         Fluttertoast.showToast(
             msg: "Failed to settle batch! exception: ex",
             toastLength: Toast.LENGTH_SHORT,
@@ -340,16 +346,22 @@ class SettlementScreenState extends State<SettlementScreen> {
   }
 
   String formatCurrency(String x) {
-    if (x == "0") {
-      x = "000";
+    try {
+      if (x == "0") {
+        x = "000";
+      }
+      var formatter = new NumberFormat("#,##0.00", "en_US");
+
+      x = x.substring(0, x.length - 2) + "." + x.substring(x.length - 2);
+
+      var currency = formatter.format(double.parse(x)).toString();
+
+      return '\$$currency';
+    } catch (err) {
+      Logger.error(err);
     }
-    var formatter = new NumberFormat("#,##0.00", "en_US");
 
-    x = x.substring(0, x.length - 2) + "." + x.substring(x.length - 2);
-
-    var currency = formatter.format(double.parse(x)).toString();
-
-    return '\$$currency';
+    return '\$0.00';
   }
 
   String formatDate(String d) {

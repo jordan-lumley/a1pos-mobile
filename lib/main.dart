@@ -4,15 +4,17 @@ import 'package:a1pos/screens/settlement.dart';
 import 'package:a1pos/screens/dashboard.dart';
 import 'package:a1pos/screens/settings.dart';
 import 'package:a1pos/screens/terminal.dart';
+import 'package:a1pos/services/logger.dart';
 import 'package:a1pos/services/settings.dart';
 import 'package:flutter/material.dart';
 
 Timer autoBatchTimer;
 SettingsPlatformService settingsService = SettingsPlatformService();
 
-void main() {
+Future<void> main() async {
   WidgetsFlutterBinding.ensureInitialized();
 
+  await Logger.initialize();
   // settingsService.getAutoBatchStatus().then((status) {
   //   var needsStarted = false;
   //   if (status != null) {
